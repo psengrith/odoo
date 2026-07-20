@@ -32,6 +32,10 @@ class TableObject:
     message: ConstraintMessageType = ''
     _module: str = ''
 
+    @property
+    def definition(self):
+        return getattr(self, '_definition', getattr(self, '_index_definition', ''))
+
     def __init__(self):
         """Abstract SQL object"""
         # to avoid confusion: name is unique inside the model, full_name is in the database
@@ -46,7 +50,7 @@ class TableObject:
         self.name = name[1:]
         if getattr(owner, 'pool', None) is None:  # models.is_model_definition(owner)
             # only for fields on definition classes, not registry classes
-            self._module = owner._module
+            self._module = owner._module or 'base'
             owner._table_object_definitions.append(self)
 
     def get_definition(self, registry: Registry) -> str:

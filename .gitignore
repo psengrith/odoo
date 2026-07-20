@@ -51,3 +51,11 @@ package.json
 /man/
 /share/
 /src/
+
+# pyproject
+pyproject.toml
+
+# symbolic link
+odoo/addons/**
+!odoo/addons/base
+!odoo/addons/test*

@@ -148,8 +148,8 @@ class TestInherit(common.TransactionCase):
         # check inferred model attributes
         self.assertEqual(parent._table, 'test_inherit_parent')
         self.assertEqual(child._table, 'test_inherit_child')
-        self.assertEqual(len(parent._table_objects), 1)
-        self.assertEqual(len(child._table_objects), 1)
+        self.assertEqual(len(parent._table_objects), 2)
+        self.assertEqual(len(child._table_objects), 2)
 
         # check properties memoized on model
         self.assertEqual(len(parent._constraint_methods), 1)

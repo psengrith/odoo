@@ -45,6 +45,11 @@ import babel.dates
 import psycopg2.errors
 import psycopg2.extensions
 from psycopg2.extras import Json
+import sys
+if sys.version_info < (3, 14):
+    import uuid_utils as uuid
+else:
+    import uuid
 
 from odoo.exceptions import AccessError, LockError, MissingError, ValidationError, UserError
 from odoo.tools import (
@@ -66,6 +71,7 @@ from .fields import Field, determine
 from .fields_misc import Id
 from .fields_temporal import Date, Datetime
 from .fields_textual import Char
+from .table_objects import UniqueIndex
 
 from .identifiers import NewId
 from .utils import (
@@ -294,7 +300,7 @@ class MetaModel(type):
 
 # special columns automatically created by the ORM
 LOG_ACCESS_COLUMNS = ['create_uid', 'create_date', 'write_uid', 'write_date']
-MAGIC_COLUMNS = ['id'] + LOG_ACCESS_COLUMNS
+MAGIC_COLUMNS = ['id', 'guid'] + LOG_ACCESS_COLUMNS
 
 # valid SQL aggregation functions
 READ_GROUP_AGGREGATE = {
@@ -475,6 +481,29 @@ class BaseModel(metaclass=MetaModel):
         compute='_compute_display_name',
         search='_search_display_name',
     )
+    guid = Char(string='GUID', compute='_compute_guid', inverse='_inverse_guid',
+                copy=False, readonly=False, required=True, store=True)
+    _guid_uniq = UniqueIndex('(guid)', 'GUID must be unique.')
+
+    def _compute_guid(self):
+        """Compute the GUID for the records."""
+        for record in self:
+            # Check the GUID value on the unchanged, historical record state
+            original_guid = record._origin.guid if record._origin else False
+            if original_guid:
+                record.guid = original_guid
+            elif not record.guid:
+                record.guid = str(uuid.uuid7())
+    
+    def _inverse_guid(self):
+        """Inverse of _compute_guid."""
+        for record in self:
+            # Check the GUID value on the unchanged, historical record state
+            original_guid = record._origin.guid if record._origin else False
+            if original_guid and record.guid != original_guid:
+                raise ValidationError(
+                    f"This record already has a GUID: {original_guid}"
+                )
 
     def _valid_field_parameter(self, field, name):
         """ Return whether the given parameter name is valid for the field. """
@@ -3239,6 +3268,11 @@ class BaseModel(metaclass=MetaModel):
                     for field in fields_to_compute:
                         _logger.info("Prepare computation of %s", field)
                         self.env.add_to_compute(field, records)
+            
+            if 'guid' in self._fields:
+                query = SQL('ALTER TABLE %s ALTER COLUMN "guid" SET DEFAULT uuidv7();', 
+                    SQL.identifier(self._table))
+                self.env.cr.execute(query)
 
         if self._auto:
             self._add_sql_constraints()
@@ -7060,6 +7094,7 @@ class Model(AbstractModel):
     _auto: bool = True          # automatically create database backend
     _register: bool = False     # not visible in ORM registry, meant to be python-inherited only
     _abstract: typing.Literal[False] = False  # not abstract
+
 
 
 @functools.total_ordering
